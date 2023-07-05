@@ -1,11 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "/7jo+o0MmTc5Uoic0WHQIxaPXzA93MwbjauNrt4X/yTBtRncPGUQQF0Kny/Yv+h1pHHxa62u+aDrE0y7NIzn/w==",
+  "dgSpecHash": "cEnw6aal7wzIM6CGoQugg+ZU5TfrXJEsn04lwMny0GZp+T5CgsV8lYh6+prEGVM5+G5wDfiJ5kL3pYEIi5r3ag==",
   "success": true,
-  "projectFilePath": "/home/kushev/MyHttpProxy/MyHttpProxy.csproj",
+  "projectFilePath": "C:\\Users\\kushev\\RiderProjects\\DummyHTTPProxy\\MyHttpProxy.csproj",
   "expectedPackageFiles": [
-    "/home/kushev/.nuget/packages/bouncycastle.netcore/1.9.0/bouncycastle.netcore.1.9.0.nupkg.sha512",
-    "/home/kushev/.nuget/packages/microsoft.aspnetcore.app.ref/7.0.5/microsoft.aspnetcore.app.ref.7.0.5.nupkg.sha512"
+    "C:\\Users\\kushev\\.nuget\\packages\\bouncycastle.netcore\\1.9.0\\bouncycastle.netcore.1.9.0.nupkg.sha512"
   ],
   "logs": []
 }

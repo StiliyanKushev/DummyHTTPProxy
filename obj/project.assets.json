@@ -40,24 +40,26 @@
     ]
   },
   "packageFolders": {
-    "/home/kushev/.nuget/packages/": {}
+    "C:\\Users\\kushev\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/home/kushev/MyHttpProxy/MyHttpProxy.csproj",
+      "projectUniqueName": "C:\\Users\\kushev\\RiderProjects\\DummyHTTPProxy\\MyHttpProxy.csproj",
       "projectName": "MyHttpProxy",
-      "projectPath": "/home/kushev/MyHttpProxy/MyHttpProxy.csproj",
-      "packagesPath": "/home/kushev/.nuget/packages/",
-      "outputPath": "/home/kushev/MyHttpProxy/obj/",
+      "projectPath": "C:\\Users\\kushev\\RiderProjects\\DummyHTTPProxy\\MyHttpProxy.csproj",
+      "packagesPath": "C:\\Users\\kushev\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\kushev\\RiderProjects\\DummyHTTPProxy\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "/home/kushev/.nuget/NuGet/NuGet.Config"
+        "C:\\Users\\kushev\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
         "net7.0"
       ],
       "sources": {
+        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
@@ -92,12 +94,6 @@
         ],
         "assetTargetFallback": true,
         "warn": true,
-        "downloadDependencies": [
-          {
-            "name": "Microsoft.AspNetCore.App.Ref",
-            "version": "[7.0.5, 7.0.5]"
-          }
-        ],
         "frameworkReferences": {
           "Microsoft.AspNetCore.App": {
             "privateAssets": "none"
@@ -106,7 +102,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/7.0.105/RuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\7.0.203\\RuntimeIdentifierGraph.json"
       }
     }
   }
