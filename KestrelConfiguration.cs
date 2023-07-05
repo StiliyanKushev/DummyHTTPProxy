@@ -18,7 +18,7 @@ public abstract class KestrelConfiguration
 
     private static void ConfigureSniCallback(KestrelServerOptions serverOptions)
     {
-        serverOptions.ConfigureHttpsDefaults( co =>
+        serverOptions.ConfigureHttpsDefaults(co =>
         {
             co.ServerCertificateSelector = (context, name) => 
                 string.IsNullOrWhiteSpace(name) ? null :

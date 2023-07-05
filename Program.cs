@@ -1,8 +1,13 @@
 using MyHttpProxy;
 
-var builder = WebApplication.CreateBuilder(args);
+// gather information about the system at runtime
+SystemIdentifier.GatherInformation();
+
+// inject/validate our custom CA
+CAInjector.ValidateOrInject();
 
 // Register HttpClient as a service
+var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHttpClient();
 
 // Configure Kestrel
