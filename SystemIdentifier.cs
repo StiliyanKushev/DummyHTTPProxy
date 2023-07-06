@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
@@ -18,8 +17,14 @@ public struct SystemInformation
 
 public abstract class SystemIdentifier
 {
+    /// <summary>
+    /// Should be used at runtime to get any data about the system.
+    /// </summary>
     public static SystemInformation GatheredInformation;
     
+    /// <summary>
+    /// Called only once initially at startup to gather data about the system.
+    /// </summary>
     public static void GatherInformation()
     {
         GatheredInformation = new SystemInformation();

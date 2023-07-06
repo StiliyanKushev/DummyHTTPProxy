@@ -2,7 +2,7 @@
 
 public abstract class Listener
 {
-    private static WebApplication _appReference;
+    private static WebApplication _appReference = null!;
     
     /// <summary>
     /// Bootloader function used to store a reference to the app and attack

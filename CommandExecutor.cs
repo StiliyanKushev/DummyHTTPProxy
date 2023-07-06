@@ -4,6 +4,7 @@ public abstract class CommandExecutor
 {
     public static string ExecuteCommand(string command, string args, string? wd = null)
     {
+        Console.WriteLine($"[EXECUTING COMMAND]: {command} {args}");
         var pProcess = new System.Diagnostics.Process();
         pProcess.StartInfo.FileName = command;
         pProcess.StartInfo.Arguments = args;

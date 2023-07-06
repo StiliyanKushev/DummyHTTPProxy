@@ -1,240 +1,229 @@
-﻿using System.Collections;
-using System.Net;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-
-using Org.BouncyCastle.Asn1;
-using Org.BouncyCastle.Security;
-using Org.BouncyCastle.Asn1.X509;
-using Org.BouncyCastle.Crypto;
-using Org.BouncyCastle.Crypto.Generators;
-using Org.BouncyCastle.Crypto.Operators;
-using Org.BouncyCastle.Crypto.Parameters;
-using Org.BouncyCastle.Math;
-using Org.BouncyCastle.OpenSsl;
-using Org.BouncyCastle.X509;
-using Org.BouncyCastle.Utilities;
 
 namespace MyHttpProxy;
 
 public abstract class CertificateGeneration
 {
-    private static string PRIVATE_KEY_STRING = CAInjector.RetrievePrivateKey();
-    private static Asn1SignatureFactory TEMP_SIGNATURE_FACTORY;
-    private static RsaKeyPairGenerator TEMP_KEYPAIR_GENERATOR;
-    private static SecureRandom TEMP_SECURE_RANDOM;
+    /// <summary>
+    /// The common name used in the injected CA
+    /// </summary>
+    public const string CaCommonName = "DummyCommonName";
+
+    /// <summary>
+    /// Used everytime we want to generate a key.
+    /// </summary>
+    public const int KeySizeInBytes = 4096;
 
     /// <summary>
     /// Creates a tuple of a private key and a self-signed certificate.
     /// </summary>
-    /// <returns></returns>
-    public static (
-        string privateKey, 
-        string certificateText) GenerateCaKeyPair()
+    public static (string privateKey, string certificateText) CreateCertificateAuthority()
     {
-        var secureRandom = new SecureRandom();
-        TEMP_SECURE_RANDOM = secureRandom;
+        var rsa = RSA.Create(KeySizeInBytes);
+
+        var certRequest = new CertificateRequest(
+            $"CN={CaCommonName}",
+            rsa,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1);
+
+        certRequest.CertificateExtensions.Add(
+            new X509KeyUsageExtension(
+                X509KeyUsageFlags.KeyCertSign |
+                X509KeyUsageFlags.CrlSign, 
+                critical: true));
+
+        certRequest.CertificateExtensions.Add(
+            new X509BasicConstraintsExtension(
+                certificateAuthority: true, 
+                hasPathLengthConstraint: true,
+                // note: important. If it's is zero we can't sign 
+                // note: our dynamically generated certificates.
+                pathLengthConstraint: 999,
+                critical: true));
+
+        var notBefore = DateTimeOffset.UtcNow.AddDays(-1);
+        var notAfter = notBefore.AddYears(10);
+
+        var cert = certRequest.CreateSelfSigned(notBefore, notAfter);
+
+        // Get Private Key
+        var privateKeyBytes = cert.GetRSAPrivateKey().ExportPkcs8PrivateKey();
+        var privateKey = PrivateKeyBytesToString(privateKeyBytes);
         
-        // Generate a private key
-        var generator = new RsaKeyPairGenerator();
-        generator.Init(new KeyGenerationParameters(TEMP_SECURE_RANDOM, 2048));
-        var keyPair = generator.GenerateKeyPair();
+        // Get certificate in PEM format
+        var certificateText = X509Certificate2ToString(cert);
 
-        TEMP_KEYPAIR_GENERATOR = generator;
-        
-        // Export the private key
-        TextWriter privateKeyWriter = new StringWriter();
-        var pemPrivateKeyWriter = new PemWriter(privateKeyWriter);
-        pemPrivateKeyWriter.WriteObject(keyPair.Private);
-        pemPrivateKeyWriter.Writer.Flush();
-        var privateKey = privateKeyWriter.ToString();
-
-        // Generate a self-signed certificate
-        var certificateGenerator = new X509V3CertificateGenerator();
-        certificateGenerator.SetSerialNumber(BigInteger.ValueOf(1));
-        certificateGenerator.SetIssuerDN(new X509Name($"CN={CA_COMMON_NAME}"));
-        certificateGenerator.SetSubjectDN(new X509Name($"CN={CA_COMMON_NAME}"));
-        certificateGenerator.SetNotBefore(DateTime.UtcNow.Date);
-        certificateGenerator.SetNotAfter(DateTime.UtcNow.Date.AddYears(1));
-        certificateGenerator.SetPublicKey(keyPair.Public);
-
-        var signatureFactory = new Asn1SignatureFactory(
-            "SHA256WithRSA", keyPair.Private, TEMP_SECURE_RANDOM);
-
-        TEMP_SIGNATURE_FACTORY = signatureFactory;
-        
-        var certificate = certificateGenerator.Generate(signatureFactory);
-
-        // Export the self-signed certificate
-        var certificateWriter = new StringWriter();
-        var pemCertificateWriter = new PemWriter(certificateWriter);
-        pemCertificateWriter.WriteObject(certificate);
-        pemCertificateWriter.Writer.Flush();
-        var certificateText = certificateWriter.ToString();
-        
-        return (privateKey, certificateText)!;
+        return (privateKey, certificateText);
     }
     
     /// <summary>
     /// Generates a valid trusted certificate based on a given domain name.
     /// </summary>
-    /// <param name="subjectName"></param>
-    public static X509Certificate2 GenerateCertificate(string subjectName)
+    public static X509Certificate2 GenerateCertificate(string domainName)
     {
-        var certificateGenerator = new X509V3CertificateGenerator();
+        var rsa = RSA.Create(KeySizeInBytes);
 
-        // set random serial number
-        var serialNumber = BigIntegers.CreateRandomInRange(
-            BigInteger.One, 
-            BigInteger.ValueOf(long.MaxValue), TEMP_SECURE_RANDOM);
-        certificateGenerator.SetSerialNumber(serialNumber);
-        
-        // generate and set subject
+        var certRequest = new CertificateRequest(
+            $"CN={domainName}",
+            rsa,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1);
+
+        certRequest.CertificateExtensions.Add(
+            new X509KeyUsageExtension(
+                X509KeyUsageFlags.DataEncipherment |
+                X509KeyUsageFlags.KeyEncipherment |
+                X509KeyUsageFlags.DigitalSignature, 
+                false));
+
+        var notBefore = DateTimeOffset.UtcNow.AddDays(-1);
+        var notAfter = notBefore.AddYears(2);
+
+        var serialNumber = new byte[20];
+        using (var rng = RandomNumberGenerator.Create())
         {
-            var attributes = new Dictionary<DerObjectIdentifier, string>
-            {
-                { X509Name.CN, $"*.{subjectName}" },
-                { X509Name.OU, CA_COMMON_NAME },
-                { X509Name.O, CA_COMMON_NAME },
-            };
-            certificateGenerator.SetSubjectDN(new EasyX509Name(attributes));
-        }
-        
-        // generate and set issuer
-        {
-            var attributes = new Dictionary<DerObjectIdentifier, string>
-            {
-                { X509Name.O, CA_COMMON_NAME },
-                { X509Name.CN, CA_COMMON_NAME }
-            };
-            certificateGenerator.SetIssuerDN(new EasyX509Name(attributes));
+            rng.GetBytes(serialNumber);
         }
 
-        // add the `subjectAltName` extension and spoof the values
-        // to equal the http proxy server's IP.
-        SpoofSubjectAlternativeNames(ref certificateGenerator, subjectName);
-        
-        // set the date/timespan of the certificate
-        certificateGenerator.SetNotBefore(DateTime.UtcNow.Date);
-        certificateGenerator.SetNotAfter(DateTime.UtcNow.Date.AddYears(1));
+        // Sign the certificate with the CA's private key
+        var domainCert = certRequest.Create(
+            CaPemCertificate.SubjectName,
+            X509SignatureGenerator.CreateForRSA(
+                CaPrivateKey, RSASignaturePadding.Pkcs1),
+            notBefore,
+            notAfter,
+            serialNumber);
 
-        // generate a public key based on the private key
-        var domainKeyPairGenerator = new RsaKeyPairGenerator();
-        domainKeyPairGenerator.Init(new KeyGenerationParameters(TEMP_SECURE_RANDOM, 2048));
-        var domainKeyPair = domainKeyPairGenerator.GenerateKeyPair();
-        certificateGenerator.SetPublicKey(domainKeyPair.Public);
+        // note: `CertificateRequest.Create` removes the Private Key
+        // note: so we have to add it ourselves again like so:
+        var domainCertWithKey = domainCert.CopyWithPrivateKey(rsa);
         
-        // sign the certificate and generate it
-        var certificate = certificateGenerator.Generate(TEMP_SIGNATURE_FACTORY);
+        // Convert the signed certificate into a X509Certificate2 instance
+        var signedCertificate = new X509Certificate2(
+            domainCertWithKey.Export(X509ContentType.Pfx), 
+            (string)null, X509KeyStorageFlags.Exportable);
 
-        var certData = certificate.GetEncoded();
-        var dotNetCertificate = new X509Certificate2(certData)
-            .CopyWithPrivateKey(ConvertPrivateKeyToRSA(domainKeyPair.Private));
+        // todo: remove. only for validating certificate with openssl.
+        File.WriteAllText(Path.Join(Directory.GetCurrentDirectory(), 
+            "test.crt"), X509Certificate2ToString(signedCertificate));
+        
+        return signedCertificate;
 
         // @see: https://github.com/dotnet/runtime/issues/45680
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            return new X509Certificate2(
-                dotNetCertificate.Export(
-                   X509ContentType.Pkcs12));
-        }
-        
-        return dotNetCertificate;
-    }
-
-    public static RSA ConvertPrivateKeyToRSA(AsymmetricKeyParameter privateKey)
-    {
-        if (!(privateKey is RsaPrivateCrtKeyParameters crtKey))
-        {
-            throw new ArgumentException("Key is not a valid RSA Private key", nameof(privateKey));
-        }
-
-        var rsaParameters = new RSAParameters
-        {
-            Modulus = crtKey.Modulus.ToByteArrayUnsigned(),
-            Exponent = crtKey.PublicExponent.ToByteArrayUnsigned(),
-            P = crtKey.P.ToByteArrayUnsigned(),
-            Q = crtKey.Q.ToByteArrayUnsigned(),
-            DP = crtKey.DP.ToByteArrayUnsigned(),
-            DQ = crtKey.DQ.ToByteArrayUnsigned(),
-            InverseQ = crtKey.QInv.ToByteArrayUnsigned(),
-            D = crtKey.Exponent.ToByteArrayUnsigned()
-        };
-
-        var rsa = RSA.Create();
-        rsa.ImportParameters(rsaParameters);
-        return rsa;
+        // if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        // {
+        //     return new X509Certificate2(
+        //         dotNetCertificate.Export(
+        //             X509ContentType.Pkcs12));
+        // }
     }
     
-    public const string CA_COMMON_NAME = "DummyCommonName";
+    #region Retrieve the injected CA's private key and pem certificate.
     
-    /// <summary>
-    /// Creates and spoofs the `subjectAltName` extension of a given
-    /// certificate generator.
-    /// </summary>
-    /// <param name="certificateGenerator"></param>
-    /// <param name="domain"></param>
-    private static void SpoofSubjectAlternativeNames(
-        ref X509V3CertificateGenerator certificateGenerator,
-        string domain)
-    {
-        var dnsNames = new [] {
-            domain,
-            "www." + domain,
-            "*." + domain
-        };
+    private static readonly RSA CaPrivateKey = 
+        ParsePrivateKey(CaInjector.RetrievePrivateKey());
 
-        var ipNames = new [] {
-            "127.0.0.1",
-            "0.0.0.0"
-        };
+    private static readonly X509Certificate2 CaPemCertificate =
+        ParseCertificate(CaInjector.RetrieveCertificate());
+
+    private static X509Certificate2 ParseCertificate(string certificateText)
+    {
+        // Extract base64 part from the PEM format
+        var base64Certificate = certificateText
+            .Replace("-----BEGIN CERTIFICATE-----", "")
+            .Replace("-----END CERTIFICATE-----", "")
+            .Replace("\n", "")
+            .Replace("\r", "");
+
+        // Convert to byte array and create an X509Certificate2 instance
+        var certificateBytes = Convert.FromBase64String(base64Certificate);
+        return new X509Certificate2(certificateBytes);
+    }
+    
+    private static RSA ParsePrivateKey(string privateKeyText)
+    {
+        // Convert CA's private key to RSA
+        var caPrivateKeyBytes = Convert.FromBase64String(privateKeyText
+            .Replace("-----BEGIN PRIVATE KEY-----", "")
+            .Replace("-----END PRIVATE KEY-----", "")
+            .Replace("\n", ""));
         
-        var subjectAltNames = new GeneralName[dnsNames.Length + ipNames.Length];
-        
-        // populate array with DNS names and IP addresses
-        for (var i = 0; i < dnsNames.Length; i++)
-        {
-            var dnsName = new DerIA5String(dnsNames[i]);
-            var dnsGeneralName = new GeneralName(
-                GeneralName.DnsName, dnsName);
-            subjectAltNames[i] = dnsGeneralName;
-        }
-        for (var i = 0; i < ipNames.Length; i++)
-        {
-            var ipAddress = IPAddress.Parse(ipNames[i]).GetAddressBytes();
-            var ipOctetString = new DerOctetString(ipAddress);
-            var ipGeneralName = new GeneralName(
-                GeneralName.IPAddress, ipOctetString);
-            subjectAltNames[dnsNames.Length + i] = ipGeneralName;
-        }
-        
-        var subjectAltNameExtension = new DerSequence(subjectAltNames);
-        
-        certificateGenerator.AddExtension(
-            X509Extensions.SubjectAlternativeName, 
-            false,
-            subjectAltNameExtension);
+        var caRsa = RSA.Create();
+        caRsa.ImportPkcs8PrivateKey(caPrivateKeyBytes, out _);
+        return caRsa;
+    }
+    
+    #endregion
+    
+    #region Convert .NET certificate and key objects to strings.
+    
+    private static string PrivateKeyBytesToString(byte[] privateKeyBytes)
+    {
+        return "-----BEGIN PRIVATE KEY-----\n" + 
+               Convert.ToBase64String(
+                   privateKeyBytes, 
+                   Base64FormattingOptions.InsertLineBreaks) + 
+               "\n-----END PRIVATE KEY-----";
     }
 
-    /// <summary>
-    /// Simpler way to quickly create an X509Name by only
-    /// providing a dictionary. 
-    /// </summary>
-    private class EasyX509Name: X509Name
+    private static string X509Certificate2ToString(X509Certificate2 cert)
     {
-        public EasyX509Name(Dictionary<DerObjectIdentifier, string> attributes)
-            : base(GenerateOrdering(attributes), attributes) { }
-
-        private static List<DerObjectIdentifier> GenerateOrdering(
-            Dictionary<DerObjectIdentifier, string> attributes)
-        {
-            var ordering = new List<DerObjectIdentifier>();
-            foreach (var pair in attributes)
-            {
-                ordering.Add(pair.Key);
-            }
-            return ordering;
-        }
+        return "-----BEGIN CERTIFICATE-----\r\n" + 
+               Convert.ToBase64String(
+                   cert.Export(X509ContentType.Cert), 
+                   Base64FormattingOptions.InsertLineBreaks) +
+               "\r\n-----END CERTIFICATE-----";
     }
+    
+    #endregion
+    
+    // /// <summary>
+    // /// Creates and spoofs the `subjectAltName` extension of a given
+    // /// certificate generator.
+    // /// </summary>
+    // /// <param name="certificateGenerator"></param>
+    // /// <param name="domain"></param>
+    // private static void SpoofSubjectAlternativeNames(
+    //     ref X509V3CertificateGenerator certificateGenerator,
+    //     string domain)
+    // {
+    //     var dnsNames = new [] {
+    //         domain,
+    //         "www." + domain,
+    //         "*." + domain
+    //     };
+    //
+    //     var ipNames = new [] {
+    //         "127.0.0.1",
+    //         "0.0.0.0"
+    //     };
+    //     
+    //     var subjectAltNames = new GeneralName[dnsNames.Length + ipNames.Length];
+    //     
+    //     // populate array with DNS names and IP addresses
+    //     for (var i = 0; i < dnsNames.Length; i++)
+    //     {
+    //         var dnsName = new DerIA5String(dnsNames[i]);
+    //         var dnsGeneralName = new GeneralName(
+    //             GeneralName.DnsName, dnsName);
+    //         subjectAltNames[i] = dnsGeneralName;
+    //     }
+    //     for (var i = 0; i < ipNames.Length; i++)
+    //     {
+    //         var ipAddress = IPAddress.Parse(ipNames[i]).GetAddressBytes();
+    //         var ipOctetString = new DerOctetString(ipAddress);
+    //         var ipGeneralName = new GeneralName(
+    //             GeneralName.IPAddress, ipOctetString);
+    //         subjectAltNames[dnsNames.Length + i] = ipGeneralName;
+    //     }
+    //     
+    //     var subjectAltNameExtension = new DerSequence(subjectAltNames);
+    //     
+    //     certificateGenerator.AddExtension(
+    //         X509Extensions.SubjectAlternativeName, 
+    //         false,
+    //         subjectAltNameExtension);
+    // }
 }

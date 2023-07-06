@@ -1,70 +1,31 @@
 {
   "version": 3,
   "targets": {
-    "net7.0": {
-      "BouncyCastle.Cryptography/2.2.1": {
-        "type": "package",
-        "compile": {
-          "lib/net6.0/BouncyCastle.Cryptography.dll": {
-            "related": ".xml"
-          }
-        },
-        "runtime": {
-          "lib/net6.0/BouncyCastle.Cryptography.dll": {
-            "related": ".xml"
-          }
-        }
-      }
-    }
+    "net7.0": {}
   },
-  "libraries": {
-    "BouncyCastle.Cryptography/2.2.1": {
-      "sha512": "A6Zr52zVqJKt18ZBsTnX0qhG0kwIQftVAjLmszmkiR/trSp8H+xj1gUOzk7XHwaKgyREMSV1v9XaKrBUeIOdvQ==",
-      "type": "package",
-      "path": "bouncycastle.cryptography/2.2.1",
-      "files": [
-        ".nupkg.metadata",
-        ".signature.p7s",
-        "LICENSE.md",
-        "README.md",
-        "bouncycastle.cryptography.2.2.1.nupkg.sha512",
-        "bouncycastle.cryptography.nuspec",
-        "lib/net461/BouncyCastle.Cryptography.dll",
-        "lib/net461/BouncyCastle.Cryptography.xml",
-        "lib/net6.0/BouncyCastle.Cryptography.dll",
-        "lib/net6.0/BouncyCastle.Cryptography.xml",
-        "lib/netstandard2.0/BouncyCastle.Cryptography.dll",
-        "lib/netstandard2.0/BouncyCastle.Cryptography.xml",
-        "packageIcon.png"
-      ]
-    }
-  },
+  "libraries": {},
   "projectFileDependencyGroups": {
-    "net7.0": [
-      "BouncyCastle.Cryptography >= 2.2.1"
-    ]
+    "net7.0": []
   },
   "packageFolders": {
-    "C:\\Users\\kushev\\.nuget\\packages\\": {}
+    "/home/kushev/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\kushev\\RiderProjects\\DummyHTTPProxy\\MyHttpProxy.csproj",
+      "projectUniqueName": "/home/kushev/MyHttpProxy/MyHttpProxy.csproj",
       "projectName": "MyHttpProxy",
-      "projectPath": "C:\\Users\\kushev\\RiderProjects\\DummyHTTPProxy\\MyHttpProxy.csproj",
-      "packagesPath": "C:\\Users\\kushev\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\kushev\\RiderProjects\\DummyHTTPProxy\\obj\\",
+      "projectPath": "/home/kushev/MyHttpProxy/MyHttpProxy.csproj",
+      "packagesPath": "/home/kushev/.nuget/packages/",
+      "outputPath": "/home/kushev/MyHttpProxy/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\kushev\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        "/home/kushev/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net7.0"
       ],
       "sources": {
-        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
@@ -82,12 +43,6 @@
     "frameworks": {
       "net7.0": {
         "targetAlias": "net7.0",
-        "dependencies": {
-          "BouncyCastle.Cryptography": {
-            "target": "Package",
-            "version": "[2.2.1, )"
-          }
-        },
         "imports": [
           "net461",
           "net462",
@@ -99,6 +54,12 @@
         ],
         "assetTargetFallback": true,
         "warn": true,
+        "downloadDependencies": [
+          {
+            "name": "Microsoft.AspNetCore.App.Ref",
+            "version": "[7.0.5, 7.0.5]"
+          }
+        ],
         "frameworkReferences": {
           "Microsoft.AspNetCore.App": {
             "privateAssets": "none"
@@ -107,7 +68,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\7.0.203\\RuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/7.0.105/RuntimeIdentifierGraph.json"
       }
     }
   }
