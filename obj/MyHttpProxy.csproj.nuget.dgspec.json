@@ -1,25 +1,27 @@
 {
   "format": 1,
   "restore": {
-    "/home/kushev/MyHttpProxy/MyHttpProxy.csproj": {}
+    "C:\\Users\\kushev\\RiderProjects\\DummyHTTPProxy\\MyHttpProxy.csproj": {}
   },
   "projects": {
-    "/home/kushev/MyHttpProxy/MyHttpProxy.csproj": {
+    "C:\\Users\\kushev\\RiderProjects\\DummyHTTPProxy\\MyHttpProxy.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/home/kushev/MyHttpProxy/MyHttpProxy.csproj",
+        "projectUniqueName": "C:\\Users\\kushev\\RiderProjects\\DummyHTTPProxy\\MyHttpProxy.csproj",
         "projectName": "MyHttpProxy",
-        "projectPath": "/home/kushev/MyHttpProxy/MyHttpProxy.csproj",
-        "packagesPath": "/root/.nuget/packages/",
-        "outputPath": "/home/kushev/MyHttpProxy/obj/",
+        "projectPath": "C:\\Users\\kushev\\RiderProjects\\DummyHTTPProxy\\MyHttpProxy.csproj",
+        "packagesPath": "C:\\Users\\kushev\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\kushev\\RiderProjects\\DummyHTTPProxy\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/root/.nuget/NuGet/NuGet.Config"
+          "C:\\Users\\kushev\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
           "net7.0"
         ],
         "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -38,9 +40,9 @@
         "net7.0": {
           "targetAlias": "net7.0",
           "dependencies": {
-            "BouncyCastle.NetCore": {
+            "BouncyCastle.Cryptography": {
               "target": "Package",
-              "version": "[1.9.0, )"
+              "version": "[2.2.1, )"
             }
           },
           "imports": [
@@ -54,12 +56,6 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[7.0.5, 7.0.5]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.AspNetCore.App": {
               "privateAssets": "none"
@@ -68,7 +64,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/7.0.105/RuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\7.0.203\\RuntimeIdentifierGraph.json"
         }
       }
     }

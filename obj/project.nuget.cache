@@ -1,11 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "WtvQLzq4ZYgJGi1HgTdVBN6elNyuyOBNOaFsWtqFbs2Zm8VbqXMlgcEe60F/WLdvXNn5W3wnoK6Rk+Sl0cCoIA==",
+  "dgSpecHash": "KoTg5rgPo+tM+r9FkXgQGSf0GOa6C7G36DKdy5yaIaAZzp80Eldfz2o76fi2LIW3sqdEzFrziT52N2iKT/gUeQ==",
   "success": true,
-  "projectFilePath": "/home/kushev/MyHttpProxy/MyHttpProxy.csproj",
+  "projectFilePath": "C:\\Users\\kushev\\RiderProjects\\DummyHTTPProxy\\MyHttpProxy.csproj",
   "expectedPackageFiles": [
-    "/root/.nuget/packages/bouncycastle.netcore/1.9.0/bouncycastle.netcore.1.9.0.nupkg.sha512",
-    "/root/.nuget/packages/microsoft.aspnetcore.app.ref/7.0.5/microsoft.aspnetcore.app.ref.7.0.5.nupkg.sha512"
+    "C:\\Users\\kushev\\.nuget\\packages\\bouncycastle.cryptography\\2.2.1\\bouncycastle.cryptography.2.2.1.nupkg.sha512"
   ],
   "logs": []
 }

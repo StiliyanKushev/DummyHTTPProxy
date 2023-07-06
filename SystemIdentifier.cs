@@ -37,26 +37,29 @@ public abstract class SystemIdentifier
         {
             GatheredInformation.OsPlatform = OSPlatform.OSX;
         }
-        
-        // define the flavor (linux only)
-        var distroId = GetLinuxDistroId();
 
-        if (distroId == null)
+        if (GatheredInformation.OsPlatform == OSPlatform.Linux)
         {
-            Console.WriteLine("Fatal: unrecognized linux distro.");
-            Environment.Exit(1);
-        }
-        else if(distroId.Contains("debian"))
-        {
-            GatheredInformation.OsFlavor = SystemInformation.OSFlavor.DEBIAN;
-        }
-        else if(distroId.Contains("ubuntu"))
-        {
-            GatheredInformation.OsFlavor = SystemInformation.OSFlavor.UBUNTU;
-        }
-        else if(distroId.Contains("arch"))
-        {
-            GatheredInformation.OsFlavor = SystemInformation.OSFlavor.ARCH;
+            // define the flavor (linux only)
+            var distroId = GetLinuxDistroId();
+
+            if (distroId == null)
+            {
+                Console.WriteLine("Fatal: unrecognized linux distro.");
+                Environment.Exit(1);
+            }
+            else if(distroId.Contains("debian"))
+            {
+                GatheredInformation.OsFlavor = SystemInformation.OSFlavor.DEBIAN;
+            }
+            else if(distroId.Contains("ubuntu"))
+            {
+                GatheredInformation.OsFlavor = SystemInformation.OSFlavor.UBUNTU;
+            }
+            else if(distroId.Contains("arch"))
+            {
+                GatheredInformation.OsFlavor = SystemInformation.OSFlavor.ARCH;
+            }
         }
     }
     

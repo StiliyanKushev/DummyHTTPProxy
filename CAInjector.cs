@@ -44,7 +44,7 @@ public abstract class CAInjector
         // store the private key
         File.WriteAllText(Path.Join(Directory.GetCurrentDirectory(), 
             CA_PRIVATE_KEY_FILE_NAME), privateKey);
-
+        
         string certificatePath;
         
         if (SystemIdentifier.GatheredInformation.OsPlatform == 
@@ -60,6 +60,8 @@ public abstract class CAInjector
                 Process.Start("trust", "extract-compat").WaitForExit();
                 return;
             }
+            
+            // non-arch distros use this
             certificatePath = Path.Join(
                 "/usr/local/share/ca-certificates/",
                 CA_FILE_NAME);
@@ -69,7 +71,17 @@ public abstract class CAInjector
         if (SystemIdentifier.GatheredInformation.OsPlatform ==
             OSPlatform.Windows)
         {
-            // todo:
+            // delete the CA if it exist (just in case)
+            CommandExecutor.ExecuteCommand("certutil", $"-delstore \"Root\" \"{
+                    CertificateGeneration.CA_COMMON_NAME}\"");
+
+            certificatePath = Path.Join(Directory.CreateTempSubdirectory(
+                    "dummyCA").FullName, CA_FILE_NAME);
+            File.WriteAllText(certificatePath, certificateText);
+            
+            // add the newly stored CA as root
+            CommandExecutor.ExecuteCommand("certutil", $"-addstore \"Root\" \"{
+                certificatePath}\"");
         }
         if (SystemIdentifier.GatheredInformation.OsPlatform ==
             OSPlatform.OSX)
@@ -99,7 +111,10 @@ public abstract class CAInjector
         if (SystemIdentifier.GatheredInformation.OsPlatform ==
                  OSPlatform.Windows)
         {
-            // todo:
+            var output = CommandExecutor.ExecuteCommand("certutil",
+                $"-verifystore \"Root\" \"{
+                    CertificateGeneration.CA_COMMON_NAME}\"");
+            return output.Contains(CertificateGeneration.CA_COMMON_NAME);
         }
         if (SystemIdentifier.GatheredInformation.OsPlatform ==
                  OSPlatform.OSX)

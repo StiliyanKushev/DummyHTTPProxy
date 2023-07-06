@@ -21,7 +21,10 @@ namespace MyHttpProxy;
 public abstract class CertificateGeneration
 {
     private static string PRIVATE_KEY_STRING = CAInjector.RetrievePrivateKey();
-    
+    private static Asn1SignatureFactory TEMP_SIGNATURE_FACTORY;
+    private static RsaKeyPairGenerator TEMP_KEYPAIR_GENERATOR;
+    private static SecureRandom TEMP_SECURE_RANDOM;
+
     /// <summary>
     /// Creates a tuple of a private key and a self-signed certificate.
     /// </summary>
@@ -30,11 +33,16 @@ public abstract class CertificateGeneration
         string privateKey, 
         string certificateText) GenerateCaKeyPair()
     {
+        var secureRandom = new SecureRandom();
+        TEMP_SECURE_RANDOM = secureRandom;
+        
         // Generate a private key
         var generator = new RsaKeyPairGenerator();
-        generator.Init(new KeyGenerationParameters(new SecureRandom(), 2048));
+        generator.Init(new KeyGenerationParameters(TEMP_SECURE_RANDOM, 2048));
         var keyPair = generator.GenerateKeyPair();
 
+        TEMP_KEYPAIR_GENERATOR = generator;
+        
         // Export the private key
         TextWriter privateKeyWriter = new StringWriter();
         var pemPrivateKeyWriter = new PemWriter(privateKeyWriter);
@@ -50,9 +58,13 @@ public abstract class CertificateGeneration
         certificateGenerator.SetNotBefore(DateTime.UtcNow.Date);
         certificateGenerator.SetNotAfter(DateTime.UtcNow.Date.AddYears(1));
         certificateGenerator.SetPublicKey(keyPair.Public);
-        certificateGenerator.SetSignatureAlgorithm("SHA256WithRSA");
 
-        var certificate = certificateGenerator.Generate(keyPair.Private);
+        var signatureFactory = new Asn1SignatureFactory(
+            "SHA256WithRSA", keyPair.Private, TEMP_SECURE_RANDOM);
+
+        TEMP_SIGNATURE_FACTORY = signatureFactory;
+        
+        var certificate = certificateGenerator.Generate(signatureFactory);
 
         // Export the self-signed certificate
         var certificateWriter = new StringWriter();
@@ -70,13 +82,12 @@ public abstract class CertificateGeneration
     /// <param name="subjectName"></param>
     public static X509Certificate2 GenerateCertificate(string subjectName)
     {
-        var random = new SecureRandom();
         var certificateGenerator = new X509V3CertificateGenerator();
 
         // set random serial number
         var serialNumber = BigIntegers.CreateRandomInRange(
             BigInteger.One, 
-            BigInteger.ValueOf(long.MaxValue), random);
+            BigInteger.ValueOf(long.MaxValue), TEMP_SECURE_RANDOM);
         certificateGenerator.SetSerialNumber(serialNumber);
         
         // generate and set subject
@@ -95,8 +106,7 @@ public abstract class CertificateGeneration
             var attributes = new Dictionary<DerObjectIdentifier, string>
             {
                 { X509Name.O, CA_COMMON_NAME },
-                { X509Name.OU, "Local Certificate Authority" },
-                { X509Name.CN, CA_COMMON_NAME },
+                { X509Name.CN, CA_COMMON_NAME }
             };
             certificateGenerator.SetIssuerDN(new EasyX509Name(attributes));
         }
@@ -109,45 +119,18 @@ public abstract class CertificateGeneration
         certificateGenerator.SetNotBefore(DateTime.UtcNow.Date);
         certificateGenerator.SetNotAfter(DateTime.UtcNow.Date.AddYears(1));
 
-        // get the private key from PRIVATE_KEY_STRING
-        var privateKeyReader = new PemReader(
-            new StringReader(PRIVATE_KEY_STRING));
-        var privateKey = ((AsymmetricCipherKeyPair)
-            privateKeyReader.ReadObject()).Private;
-        
         // generate a public key based on the private key
-        var keyPairGenerator = new RsaKeyPairGenerator();
-        keyPairGenerator.Init(new RsaKeyGenerationParameters(
-            ((RsaPrivateCrtKeyParameters)privateKey).PublicExponent,
-            random, 2048, 100));
-        var subjectKeyPair = keyPairGenerator.GenerateKeyPair();
-        certificateGenerator.SetPublicKey(subjectKeyPair.Public);
+        var domainKeyPairGenerator = new RsaKeyPairGenerator();
+        domainKeyPairGenerator.Init(new KeyGenerationParameters(TEMP_SECURE_RANDOM, 2048));
+        var domainKeyPair = domainKeyPairGenerator.GenerateKeyPair();
+        certificateGenerator.SetPublicKey(domainKeyPair.Public);
         
         // sign the certificate and generate it
-        var signatureFactory = new Asn1SignatureFactory(
-            "SHA256WithRSA", privateKey, random);
-        var certificate = certificateGenerator.Generate(signatureFactory);
-        
-        // todo: remove
-        
-        // store file so I can use openssl to verify
-        var certificateWriter = new StringWriter();
-        var pemCertificateWriter = new PemWriter(certificateWriter);
-        pemCertificateWriter.WriteObject(certificate);
-        pemCertificateWriter.Writer.Flush();
-        var certificateText = certificateWriter.ToString();
-        File.WriteAllText(
-            Path.Join(
-                Directory.GetCurrentDirectory(),
-                "test.crt"), 
-            certificateText);
-        
-        // todo: remove
-        
+        var certificate = certificateGenerator.Generate(TEMP_SIGNATURE_FACTORY);
+
         var certData = certificate.GetEncoded();
-        var rsa = ConvertToRsa(subjectKeyPair);
         var dotNetCertificate = new X509Certificate2(certData)
-            .CopyWithPrivateKey(rsa);
+            .CopyWithPrivateKey(ConvertPrivateKeyToRSA(domainKeyPair.Private));
 
         // @see: https://github.com/dotnet/runtime/issues/45680
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -160,33 +143,31 @@ public abstract class CertificateGeneration
         return dotNetCertificate;
     }
 
-    private const string CA_COMMON_NAME = "DummyCommonName";
-    
-    /// <summary>
-    /// Converts AsymmetricCipherKeyPair to RSA.
-    /// </summary>
-    /// <param name="keyPair"></param>
-    private static RSA ConvertToRsa(AsymmetricCipherKeyPair keyPair)
+    public static RSA ConvertPrivateKeyToRSA(AsymmetricKeyParameter privateKey)
     {
-        var privateKeyParams = (RsaPrivateCrtKeyParameters)keyPair.Private;
+        if (!(privateKey is RsaPrivateCrtKeyParameters crtKey))
+        {
+            throw new ArgumentException("Key is not a valid RSA Private key", nameof(privateKey));
+        }
 
         var rsaParameters = new RSAParameters
         {
-            Modulus = privateKeyParams.Modulus.ToByteArrayUnsigned(),
-            Exponent = privateKeyParams.PublicExponent.ToByteArrayUnsigned(),
-            P = privateKeyParams.P.ToByteArrayUnsigned(),
-            Q = privateKeyParams.Q.ToByteArrayUnsigned(),
-            DP = privateKeyParams.DP.ToByteArrayUnsigned(),
-            DQ = privateKeyParams.DQ.ToByteArrayUnsigned(),
-            InverseQ = privateKeyParams.QInv.ToByteArrayUnsigned(),
-            D = privateKeyParams.Exponent.ToByteArrayUnsigned()
+            Modulus = crtKey.Modulus.ToByteArrayUnsigned(),
+            Exponent = crtKey.PublicExponent.ToByteArrayUnsigned(),
+            P = crtKey.P.ToByteArrayUnsigned(),
+            Q = crtKey.Q.ToByteArrayUnsigned(),
+            DP = crtKey.DP.ToByteArrayUnsigned(),
+            DQ = crtKey.DQ.ToByteArrayUnsigned(),
+            InverseQ = crtKey.QInv.ToByteArrayUnsigned(),
+            D = crtKey.Exponent.ToByteArrayUnsigned()
         };
 
         var rsa = RSA.Create();
         rsa.ImportParameters(rsaParameters);
-
         return rsa;
     }
+    
+    public const string CA_COMMON_NAME = "DummyCommonName";
     
     /// <summary>
     /// Creates and spoofs the `subjectAltName` extension of a given
@@ -245,10 +226,10 @@ public abstract class CertificateGeneration
         public EasyX509Name(Dictionary<DerObjectIdentifier, string> attributes)
             : base(GenerateOrdering(attributes), attributes) { }
 
-        private static ArrayList GenerateOrdering(
+        private static List<DerObjectIdentifier> GenerateOrdering(
             Dictionary<DerObjectIdentifier, string> attributes)
         {
-            var ordering = new ArrayList();
+            var ordering = new List<DerObjectIdentifier>();
             foreach (var pair in attributes)
             {
                 ordering.Add(pair.Key);

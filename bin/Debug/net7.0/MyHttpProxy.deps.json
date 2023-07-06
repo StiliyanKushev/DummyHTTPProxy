@@ -8,17 +8,17 @@
     ".NETCoreApp,Version=v7.0": {
       "MyHttpProxy/1.0.0": {
         "dependencies": {
-          "BouncyCastle.NetCore": "1.9.0"
+          "BouncyCastle.Cryptography": "2.2.1"
         },
         "runtime": {
           "MyHttpProxy.dll": {}
         }
       },
-      "BouncyCastle.NetCore/1.9.0": {
+      "BouncyCastle.Cryptography/2.2.1": {
         "runtime": {
-          "lib/netstandard2.0/BouncyCastle.Crypto.dll": {
-            "assemblyVersion": "1.9.0.0",
-            "fileVersion": "1.9.21290.1"
+          "lib/net6.0/BouncyCastle.Cryptography.dll": {
+            "assemblyVersion": "2.0.0.0",
+            "fileVersion": "2.2.1.47552"
           }
         }
       }
@@ -30,12 +30,12 @@
       "serviceable": false,
       "sha512": ""
     },
-    "BouncyCastle.NetCore/1.9.0": {
+    "BouncyCastle.Cryptography/2.2.1": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-FpWfsqjMp+RNavLqMlviDPlbdf7q4j/pr9SHfc1LKcZz5PRjciuYo59nFnw+eJi+H8cm0eH5uVZStwAv1LRdCw==",
-      "path": "bouncycastle.netcore/1.9.0",
-      "hashPath": "bouncycastle.netcore.1.9.0.nupkg.sha512"
+      "sha512": "sha512-A6Zr52zVqJKt18ZBsTnX0qhG0kwIQftVAjLmszmkiR/trSp8H+xj1gUOzk7XHwaKgyREMSV1v9XaKrBUeIOdvQ==",
+      "path": "bouncycastle.cryptography/2.2.1",
+      "hashPath": "bouncycastle.cryptography.2.2.1.nupkg.sha512"
     }
   }
 }
