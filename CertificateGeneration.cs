@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using System.Net;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
 namespace MyHttpProxy;
@@ -63,6 +64,8 @@ public abstract class CertificateGeneration
     /// </summary>
     public static X509Certificate2 GenerateCertificate(string domainName)
     {
+        Console.WriteLine($"[CERTIFICATE GENERATION FOR]: {domainName}");
+        
         var rsa = RSA.Create(KeySizeInBytes);
 
         var certRequest = new CertificateRequest(
@@ -78,6 +81,23 @@ public abstract class CertificateGeneration
                 X509KeyUsageFlags.DigitalSignature, 
                 false));
 
+        // Add the SubjectAlternativeName extension
+        var subjectAlternativeNames = new[]
+        {
+            "www." + domainName, 
+            "*." + domainName,
+            "localhost"
+        };
+        var subjectAlternativeIPs = new[]
+        {
+            IPAddress.Parse("127.0.0.1"), 
+            IPAddress.Parse("0.0.0.0")
+        };
+        var subjectAlternativeNamesExtension = 
+            BuildSubjectAlternativeNameExtension(
+                subjectAlternativeNames, subjectAlternativeIPs);
+        certRequest.CertificateExtensions.Add(subjectAlternativeNamesExtension);
+        
         var notBefore = DateTimeOffset.UtcNow.AddDays(-1);
         var notAfter = notBefore.AddYears(2);
 
@@ -118,6 +138,25 @@ public abstract class CertificateGeneration
         //         dotNetCertificate.Export(
         //             X509ContentType.Pkcs12));
         // }
+    }
+    
+    private static X509Extension BuildSubjectAlternativeNameExtension(
+        string[] domainNames, IPAddress[] ipAddresses)
+    {
+        // Manually build the SubjectAlternativeName extension
+        var sanBuilder = new SubjectAlternativeNameBuilder();
+    
+        foreach (var domainName in domainNames)
+        {
+            sanBuilder.AddDnsName(domainName);
+        }
+    
+        foreach (var ipAddress in ipAddresses)
+        {
+            sanBuilder.AddIpAddress(ipAddress);
+        }
+
+        return sanBuilder.Build();
     }
     
     #region Retrieve the injected CA's private key and pem certificate.
@@ -178,52 +217,4 @@ public abstract class CertificateGeneration
     }
     
     #endregion
-    
-    // /// <summary>
-    // /// Creates and spoofs the `subjectAltName` extension of a given
-    // /// certificate generator.
-    // /// </summary>
-    // /// <param name="certificateGenerator"></param>
-    // /// <param name="domain"></param>
-    // private static void SpoofSubjectAlternativeNames(
-    //     ref X509V3CertificateGenerator certificateGenerator,
-    //     string domain)
-    // {
-    //     var dnsNames = new [] {
-    //         domain,
-    //         "www." + domain,
-    //         "*." + domain
-    //     };
-    //
-    //     var ipNames = new [] {
-    //         "127.0.0.1",
-    //         "0.0.0.0"
-    //     };
-    //     
-    //     var subjectAltNames = new GeneralName[dnsNames.Length + ipNames.Length];
-    //     
-    //     // populate array with DNS names and IP addresses
-    //     for (var i = 0; i < dnsNames.Length; i++)
-    //     {
-    //         var dnsName = new DerIA5String(dnsNames[i]);
-    //         var dnsGeneralName = new GeneralName(
-    //             GeneralName.DnsName, dnsName);
-    //         subjectAltNames[i] = dnsGeneralName;
-    //     }
-    //     for (var i = 0; i < ipNames.Length; i++)
-    //     {
-    //         var ipAddress = IPAddress.Parse(ipNames[i]).GetAddressBytes();
-    //         var ipOctetString = new DerOctetString(ipAddress);
-    //         var ipGeneralName = new GeneralName(
-    //             GeneralName.IPAddress, ipOctetString);
-    //         subjectAltNames[dnsNames.Length + i] = ipGeneralName;
-    //     }
-    //     
-    //     var subjectAltNameExtension = new DerSequence(subjectAltNames);
-    //     
-    //     certificateGenerator.AddExtension(
-    //         X509Extensions.SubjectAlternativeName, 
-    //         false,
-    //         subjectAltNameExtension);
-    // }
 }
