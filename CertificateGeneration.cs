@@ -1,4 +1,6 @@
 ﻿using System.Net;
+using System.Net.Security;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
@@ -7,10 +9,27 @@ namespace MyHttpProxy;
 public abstract class CertificateGeneration
 {
     /// <summary>
-    /// The common name used in the injected CA
+    /// All of the CA attributes.
     /// </summary>
-    public const string CaCommonName = "DummyCommonName";
+    public const string CaCommonName              = "MyDummyCommonName";
+    public const string CaCountryName             = "AQ"; 
+    public const string CaStateName               = "Antartica"; 
+    public const string CaLocalityName            = "Antartica"; 
+    public const string CaOrganizationName        = CaCommonName; 
+    public const string CaOrganizationalUnitName  = "Local Certificate Authority";
+    public const string CaFriendlyName            = "Hoody Local Security";
+    public const string CaEmailAddress            = "ca@hoody.local";
 
+    /// <summary>
+    /// All of the child certificate attributes.
+    /// </summary>
+    private const string CertCountryName           = CaCommonName;
+    private const string CertStateName             = CaStateName;
+    private const string CertLocalityName          = CaLocalityName;
+    private const string CertOrganizationName      = CaCommonName;
+    private const string CertOrganizationUnitName  = CaCommonName;
+    private static Func<string, string> CertCommonName = domain => "*." + domain;
+    
     /// <summary>
     /// Used everytime we want to generate a key.
     /// </summary>
@@ -23,8 +42,20 @@ public abstract class CertificateGeneration
     {
         var rsa = RSA.Create(KeySizeInBytes);
 
+        var distinguishedName = new X500DistinguishedName(
+            string.Join(", ", new List<string>
+            {
+                $"CN={CaCommonName}", 
+                $"C={CaCountryName}",
+                $"ST={CaStateName}",
+                $"L={CaLocalityName}", 
+                $"O={CaOrganizationName}", 
+                $"OU={CaOrganizationalUnitName}",
+                $"E={CaEmailAddress}"
+            }));
+
         var certRequest = new CertificateRequest(
-            $"CN={CaCommonName}",
+            distinguishedName,
             rsa,
             HashAlgorithmName.SHA256,
             RSASignaturePadding.Pkcs1);
@@ -44,11 +75,18 @@ public abstract class CertificateGeneration
                 pathLengthConstraint: 999,
                 critical: true));
 
-        var notBefore = DateTimeOffset.UtcNow.AddDays(-1);
-        var notAfter = notBefore.AddYears(10);
+        var notBefore = DateTimeOffset.UtcNow.AddMonths(-1);
+        var notAfter = notBefore.AddYears(4);
 
         var cert = certRequest.CreateSelfSigned(notBefore, notAfter);
 
+        // Set the Ca's friendly name on windows.
+        if (SystemIdentifier.GatheredInformation.OsPlatform
+            == OSPlatform.Windows)
+        {
+            cert.FriendlyName = CaFriendlyName;
+        }
+        
         // Get Private Key
         var privateKeyBytes = cert.GetRSAPrivateKey().ExportPkcs8PrivateKey();
         var privateKey = PrivateKeyBytesToString(privateKeyBytes);
@@ -58,18 +96,48 @@ public abstract class CertificateGeneration
 
         return (privateKey, certificateText);
     }
+
+
+    /// <summary>
+    /// Generates a valid trusted certificate based on a given domain name and
+    /// converts that to an SslStreamCertificateContext.
+    /// </summary>
+    public static (
+        SslStreamCertificateContext ctx,
+        X509Certificate2 cert
+        ) GenerateCertificateSsl(
+        string domainName)
+    {
+        var (cert, collection) = GenerateCertificate(domainName);
+        var certContext =  SslStreamCertificateContext.Create(cert, collection);
+        return (certContext, cert);
+    }
     
     /// <summary>
     /// Generates a valid trusted certificate based on a given domain name.
     /// </summary>
-    public static X509Certificate2 GenerateCertificate(string domainName)
+    public static (
+        X509Certificate2 certificate,
+        X509Certificate2Collection collection
+        ) GenerateCertificate(string domainName)
     {
         Console.WriteLine($"[CERTIFICATE GENERATION FOR]: {domainName}");
         
         var rsa = RSA.Create(KeySizeInBytes);
+        
+        var distinguishedName = new X500DistinguishedName(
+            string.Join(", ", new List<string>
+            {
+                $"C={CertCountryName}",
+                $"ST={CertStateName}",
+                $"L={CertLocalityName}", 
+                $"O={CertOrganizationName}", 
+                $"OU={CertOrganizationUnitName}",
+                $"CN={CertCommonName(domainName)}"
+            }));
 
         var certRequest = new CertificateRequest(
-            $"CN={domainName}",
+            distinguishedName,
             rsa,
             HashAlgorithmName.SHA256,
             RSASignaturePadding.Pkcs1);
@@ -82,21 +150,25 @@ public abstract class CertificateGeneration
                 false));
 
         // Add the SubjectAlternativeName extension
-        var subjectAlternativeNames = new[]
+        if (domainName.Length > 0)
         {
-            "www." + domainName, 
-            "*." + domainName,
-            "localhost"
-        };
-        var subjectAlternativeIPs = new[]
-        {
-            IPAddress.Parse("127.0.0.1"), 
-            IPAddress.Parse("0.0.0.0")
-        };
-        var subjectAlternativeNamesExtension = 
-            BuildSubjectAlternativeNameExtension(
-                subjectAlternativeNames, subjectAlternativeIPs);
-        certRequest.CertificateExtensions.Add(subjectAlternativeNamesExtension);
+            var subjectAlternativeNames = new[]
+            {
+                "www." + domainName, 
+                "*." + domainName,
+                domainName
+            };
+            var subjectAlternativeIPs = new[]
+            {
+                IPAddress.Parse("127.0.0.1"), 
+                IPAddress.Parse("0.0.0.0")
+            };
+            var subjectAlternativeNamesExtension = 
+                BuildSubjectAlternativeNameExtension(
+                    subjectAlternativeNames, subjectAlternativeIPs);
+            certRequest.CertificateExtensions.Add(
+                subjectAlternativeNamesExtension);
+        }
         
         var notBefore = DateTimeOffset.UtcNow.AddDays(-1);
         var notAfter = notBefore.AddYears(2);
@@ -106,7 +178,10 @@ public abstract class CertificateGeneration
         {
             rng.GetBytes(serialNumber);
         }
-
+        
+        // Ensure the serial number is non-negative
+        serialNumber[0] &= 0x7F;
+        
         // Sign the certificate with the CA's private key
         var domainCert = certRequest.Create(
             CaPemCertificate.SubjectName,
@@ -120,24 +195,79 @@ public abstract class CertificateGeneration
         // note: so we have to add it ourselves again like so:
         var domainCertWithKey = domainCert.CopyWithPrivateKey(rsa);
         
-        // Convert the signed certificate into a X509Certificate2 instance
-        var signedCertificate = new X509Certificate2(
-            domainCertWithKey.Export(X509ContentType.Pfx), 
-            (string)null, X509KeyStorageFlags.Exportable);
+        // Convert the CA certificate and the server
+        // certificate into a .NET Certificate2Collection.
+        var collection = new X509Certificate2Collection
+        {
+            domainCertWithKey,   // add server certificate
+            CaPemCertificate     // add CA certificate
+        };
+        
+        // Convert the signed certificate into an exportable Pfx
+        var signedCertificate = CreateCertificateWithChain(collection);
 
+        // var signedCertificate = new X509Certificate2(
+        //     domainCertWithKey.Export(X509ContentType.Pfx), 
+        //     (string)null, X509KeyStorageFlags.Exportable);
+        
+        // Simple error checking
+        #if DEBUG
+            var hasPrivateKey = signedCertificate.HasPrivateKey;
+            var verified = signedCertificate.Verify();
+            Console.WriteLine($"[CERTIFICATE HAS PRIVATE KEY]: {hasPrivateKey}");
+            Console.WriteLine($"[CERTIFICATE VERIFIED]: {verified}");
+
+            if (domainName.Length > 0)
+            {
+                var matchesHostname = signedCertificate
+                    .MatchesHostname(domainName);
+                Console.WriteLine($"[CERTIFICATE MATCHES HOSTNAME]: {
+                    matchesHostname}");
+            }
+
+            // try to get the reason why it can't be verified.
+            if (verified == false)
+            {
+                var chain = new X509Chain();
+                try
+                {
+                    var chainBuilt = chain.Build(signedCertificate);
+
+                    // Print out the length of the certificate chain
+                    Console.WriteLine($"[CERT CHAIN LENGTH]: {
+                        chain.ChainElements.Count}");
+                    
+                    if (chainBuilt == false)
+                        foreach (var chainStatus in chain.ChainStatus)
+                            Console.WriteLine("Chain error: {0} {1}", 
+                                chainStatus.Status, 
+                                chainStatus.StatusInformation);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.ToString());
+                }
+            }
+        #endif
+        
         // todo: remove. only for validating certificate with openssl.
         File.WriteAllText(Path.Join(Directory.GetCurrentDirectory(), 
-            "test.crt"), X509Certificate2ToString(signedCertificate));
+            "test.pfx"), X509Certificate2ToString(signedCertificate));
         
-        return signedCertificate;
+        return (signedCertificate, collection);
+    }
+    
+    private static X509Certificate2 CreateCertificateWithChain(
+        X509Certificate2Collection collection)
+    {
+        // Then, export the collection into a PFX byte array.
+        // The private key is included as well.
+        var pfxData = collection.Export(X509ContentType.Pfx, ""); // no password
 
-        // @see: https://github.com/dotnet/runtime/issues/45680
-        // if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        // {
-        //     return new X509Certificate2(
-        //         dotNetCertificate.Export(
-        //             X509ContentType.Pkcs12));
-        // }
+        // Create and return a new X509Certificate2 from the PFX data.
+        // This certificate includes the private key and the full chain.
+        return new X509Certificate2(pfxData, "", 
+            X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable);
     }
     
     private static X509Extension BuildSubjectAlternativeNameExtension(

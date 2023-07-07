@@ -25,11 +25,16 @@ public abstract class KestrelConfiguration
     {
         serverOptions.ConfigureHttpsDefaults(co =>
         {
+            // let's not block any client certificates ourselves.
+            co.AllowAnyClientCertificate();
+            co.CheckCertificateRevocation = false;
+
             // note: even if name is null/empty we still want to generate
             // note: a certificate. Example: `openssl s_client -connect`
             // note: sends an empty name.
-            co.ServerCertificateSelector = (context, name) => 
-                CertificateGeneration.GenerateCertificate(name);
+            co.ServerCertificateSelector = (context, name) =>
+                CertificateGeneration.GenerateCertificate(name ?? "")
+                    .certificate;
         });
     }
 }
