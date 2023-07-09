@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Server.Kestrel.Core;
+﻿using System.Net.Security;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.AspNetCore.Server.Kestrel.Https;
 
 namespace MyHttpProxy;
 
@@ -11,30 +13,36 @@ public abstract class KestrelConfiguration
     /// </summary>
     public static void ConfigureServer(KestrelServerOptions serverOptions)
     {
-        ConfigureSniCallback(serverOptions);
-        
         // finally listen on the specified port
         serverOptions.ListenAnyIP(5001, listenOptions =>
         {
-            listenOptions.Protocols = HttpProtocols.Http1AndHttp2;
-            listenOptions.UseHttps();
+            listenOptions.Protocols = HttpProtocols.Http1AndHttp2AndHttp3;
+            listenOptions.UseHttps(new TlsHandshakeCallbackOptions
+            {
+                OnConnection = ConfigureSniCallback
+            });
         });
     }
 
-    private static void ConfigureSniCallback(KestrelServerOptions serverOptions)
+    private static ValueTask<SslServerAuthenticationOptions> 
+        ConfigureSniCallback(TlsHandshakeCallbackContext context)
     {
-        serverOptions.ConfigureHttpsDefaults(co =>
-        {
-            // let's not block any client certificates ourselves.
-            co.AllowAnyClientCertificate();
-            co.CheckCertificateRevocation = false;
+        // get the domain name from client hello
+        var domainName = context.ClientHelloInfo.ServerName;
+        
+        // generate a server certificate and the full-chain collection
+        // including the CA
+        var (
+            certificate,
+            collection) = CertificateGeneration.GenerateCertificate(domainName);
+        
+        // create a new ssl stream certificate context with the full-chain.
+        var sslCertificateChain = SslStreamCertificateContext.Create(
+            certificate, collection, offline: true);
 
-            // note: even if name is null/empty we still want to generate
-            // note: a certificate. Example: `openssl s_client -connect`
-            // note: sends an empty name.
-            co.ServerCertificateSelector = (context, name) =>
-                CertificateGeneration.GenerateCertificate(name ?? "")
-                    .certificate;
+        return new(new SslServerAuthenticationOptions
+        {
+            ServerCertificateContext = sslCertificateChain
         });
     }
 }

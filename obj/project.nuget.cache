@@ -1,8 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "/BcU4kJcauCekJ2oUK1fvzwzRGHXNkwDR9YLZWY3r14pe3pnoLsYV3KSey3BcHdA/memjMic5jJyuDRttUhLig==",
+  "dgSpecHash": "iSTtl6KBcXRTXrkI6aNTf6E/OAWuxGnXb2zGWuh6VnjKSnvBAEzM8R37j21z2P/8SRgvuDEenF5h6kxLFJlePw==",
   "success": true,
-  "projectFilePath": "C:\\Users\\kushev\\RiderProjects\\DummyHTTPProxy\\MyHttpProxy.csproj",
-  "expectedPackageFiles": [],
+  "projectFilePath": "/home/kushev/MyHttpProxy/MyHttpProxy.csproj",
+  "expectedPackageFiles": [
+    "/home/kushev/.nuget/packages/microsoft.aspnetcore.app.ref/7.0.5/microsoft.aspnetcore.app.ref.7.0.5.nupkg.sha512"
+  ],
   "logs": []
 }

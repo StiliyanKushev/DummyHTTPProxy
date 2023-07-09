@@ -1,5 +1,5 @@
-﻿using System.Net;
-using System.Net.Security;
+﻿using System.Collections.Concurrent;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -8,6 +8,12 @@ namespace MyHttpProxy;
 
 public abstract class CertificateGeneration
 {
+    /// <summary>
+    /// Growing memory cache of certificates per domain name.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string,
+        (X509Certificate2, X509Certificate2Collection)> CertificateCache = new ();
+
     /// <summary>
     /// All of the CA attributes.
     /// </summary>
@@ -69,10 +75,8 @@ public abstract class CertificateGeneration
         certRequest.CertificateExtensions.Add(
             new X509BasicConstraintsExtension(
                 certificateAuthority: true, 
-                hasPathLengthConstraint: true,
-                // note: important. If it's is zero we can't sign 
-                // note: our dynamically generated certificates.
-                pathLengthConstraint: 999,
+                hasPathLengthConstraint: false,
+                pathLengthConstraint: 1,
                 critical: true));
 
         var notBefore = DateTimeOffset.UtcNow.AddMonths(-1);
@@ -88,7 +92,7 @@ public abstract class CertificateGeneration
         }
         
         // Get Private Key
-        var privateKeyBytes = cert.GetRSAPrivateKey().ExportPkcs8PrivateKey();
+        var privateKeyBytes = cert.GetRSAPrivateKey()!.ExportPkcs8PrivateKey();
         var privateKey = PrivateKeyBytesToString(privateKeyBytes);
         
         // Get certificate in PEM format
@@ -97,22 +101,6 @@ public abstract class CertificateGeneration
         return (privateKey, certificateText);
     }
 
-
-    /// <summary>
-    /// Generates a valid trusted certificate based on a given domain name and
-    /// converts that to an SslStreamCertificateContext.
-    /// </summary>
-    public static (
-        SslStreamCertificateContext ctx,
-        X509Certificate2 cert
-        ) GenerateCertificateSsl(
-        string domainName)
-    {
-        var (cert, collection) = GenerateCertificate(domainName);
-        var certContext =  SslStreamCertificateContext.Create(cert, collection);
-        return (certContext, cert);
-    }
-    
     /// <summary>
     /// Generates a valid trusted certificate based on a given domain name.
     /// </summary>
@@ -121,6 +109,12 @@ public abstract class CertificateGeneration
         X509Certificate2Collection collection
         ) GenerateCertificate(string domainName)
     {
+        // try to retrieve a cached certificate before generating
+        if (CertificateCache.TryGetValue(domainName, out var cached))
+        {
+            return cached;
+        }
+        
         Console.WriteLine($"[CERTIFICATE GENERATION FOR]: {domainName}");
         
         var rsa = RSA.Create(KeySizeInBytes);
@@ -206,53 +200,51 @@ public abstract class CertificateGeneration
         // Convert the signed certificate into an exportable Pfx
         var signedCertificate = CreateCertificateWithChain(collection);
 
-        // var signedCertificate = new X509Certificate2(
-        //     domainCertWithKey.Export(X509ContentType.Pfx), 
-        //     (string)null, X509KeyStorageFlags.Exportable);
-        
         // Simple error checking
-        #if DEBUG
-            var hasPrivateKey = signedCertificate.HasPrivateKey;
-            var verified = signedCertificate.Verify();
-            Console.WriteLine($"[CERTIFICATE HAS PRIVATE KEY]: {hasPrivateKey}");
-            Console.WriteLine($"[CERTIFICATE VERIFIED]: {verified}");
+#if DEBUG
+        var hasPrivateKey = signedCertificate.HasPrivateKey;
+        var verified = signedCertificate.Verify();
+        Console.WriteLine($"[CERTIFICATE HAS PRIVATE KEY]: {hasPrivateKey}");
+        Console.WriteLine($"[CERTIFICATE VERIFIED]: {verified}");
 
-            if (domainName.Length > 0)
+        if (domainName.Length > 0)
+        {
+            var matchesHostname = signedCertificate
+                .MatchesHostname(domainName);
+            Console.WriteLine($"[CERTIFICATE MATCHES HOSTNAME]: {
+                matchesHostname}");
+        }
+
+        // try to get the reason why it can't be verified.
+        if (verified == false)
+        {
+            var chain = new X509Chain();
+            chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+            chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;   
+            
+            try
             {
-                var matchesHostname = signedCertificate
-                    .MatchesHostname(domainName);
-                Console.WriteLine($"[CERTIFICATE MATCHES HOSTNAME]: {
-                    matchesHostname}");
-            }
+                var chainBuilt = chain.Build(signedCertificate);
 
-            // try to get the reason why it can't be verified.
-            if (verified == false)
+                // Print out the length of the certificate chain
+                Console.WriteLine($"[CERT CHAIN LENGTH]: {
+                    chain.ChainElements.Count}");
+                
+                if (chainBuilt == false)
+                    foreach (var chainStatus in chain.ChainStatus)
+                        Console.WriteLine("Chain error: {0} {1}", 
+                            chainStatus.Status, 
+                            chainStatus.StatusInformation);
+            }
+            catch (Exception ex)
             {
-                var chain = new X509Chain();
-                try
-                {
-                    var chainBuilt = chain.Build(signedCertificate);
-
-                    // Print out the length of the certificate chain
-                    Console.WriteLine($"[CERT CHAIN LENGTH]: {
-                        chain.ChainElements.Count}");
-                    
-                    if (chainBuilt == false)
-                        foreach (var chainStatus in chain.ChainStatus)
-                            Console.WriteLine("Chain error: {0} {1}", 
-                                chainStatus.Status, 
-                                chainStatus.StatusInformation);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex.ToString());
-                }
+                Console.WriteLine(ex.ToString());
             }
-        #endif
+        }
+#endif
         
-        // todo: remove. only for validating certificate with openssl.
-        File.WriteAllText(Path.Join(Directory.GetCurrentDirectory(), 
-            "test.pfx"), X509Certificate2ToString(signedCertificate));
+        // insert generated certificate into the cache.
+        CertificateCache.TryAdd(domainName, (signedCertificate, collection));
         
         return (signedCertificate, collection);
     }
@@ -266,7 +258,7 @@ public abstract class CertificateGeneration
 
         // Create and return a new X509Certificate2 from the PFX data.
         // This certificate includes the private key and the full chain.
-        return new X509Certificate2(pfxData, "", 
+        return new X509Certificate2(pfxData!, "", 
             X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable);
     }
     
@@ -289,7 +281,7 @@ public abstract class CertificateGeneration
         return sanBuilder.Build();
     }
     
-    #region Retrieve the injected CA's private key and pem certificate.
+#region Retrieve the injected CA's private key and pem certificate.
     
     private static readonly RSA CaPrivateKey = 
         ParsePrivateKey(CaInjector.RetrievePrivateKey());
@@ -324,9 +316,9 @@ public abstract class CertificateGeneration
         return caRsa;
     }
     
-    #endregion
+#endregion
     
-    #region Convert .NET certificate and key objects to strings.
+#region Convert .NET certificate and key objects to strings.
     
     private static string PrivateKeyBytesToString(byte[] privateKeyBytes)
     {
@@ -346,5 +338,5 @@ public abstract class CertificateGeneration
                "\r\n-----END CERTIFICATE-----";
     }
     
-    #endregion
+#endregion
 }

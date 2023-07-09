@@ -1,12 +1,5 @@
-﻿{
-  "iisSettings": {
-    "windowsAuthentication": false,
-    "anonymousAuthentication": true,
-    "iisExpress": {
-      "applicationUrl": "http://localhost:14495",
-      "sslPort": 44377
-    }
-  },
+﻿
+{
   "Kestrel": {
     "Certificates": {
       "Default": {
@@ -16,24 +9,22 @@
     }
   },
   "profiles": {
-    "http": {
+    "dev": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": false,
-      "applicationUrl": "http://localhost:5042",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
-    "https": {
+    "prod": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": false,
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_Kestrel__Certificates__Default__AllowInvalid": "true",
-        "ASPNETCORE_Kestrel__Certificates__Default__AllowAnyCertificateAuthority": "true"
+        "ASPNETCORE_ENVIRONMENT": "Production"
       }
     }
+
   }
 }

@@ -85,6 +85,6 @@ public abstract class SystemIdentifier
             break;
         }
 
-        return distroId.ToLower();
+        return distroId!.ToLower();
     }
 }
