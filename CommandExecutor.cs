@@ -1,4 +1,6 @@
-﻿namespace MyHttpProxy;
+﻿using System;
+
+namespace MyHttpProxy;
 
 public abstract class CommandExecutor
 {

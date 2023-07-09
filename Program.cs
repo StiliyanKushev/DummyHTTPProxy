@@ -1,4 +1,7 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.WebSockets;
+using Microsoft.Extensions.DependencyInjection;
 using MyHttpProxy;
 
 // gather information about the system at runtime
