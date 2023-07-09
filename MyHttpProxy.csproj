@@ -9,5 +9,9 @@
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="obj\.gitignore" />
+  </ItemGroup>
   
 </Project>
