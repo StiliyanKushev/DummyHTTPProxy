@@ -16,7 +16,7 @@ public abstract class KestrelConfiguration
     public static void ConfigureServer(KestrelServerOptions serverOptions)
     {
         // finally listen on the specified port
-        serverOptions.ListenAnyIP(5001, listenOptions =>
+        serverOptions.ListenAnyIP(443, listenOptions =>
         {
             listenOptions.Protocols = HttpProtocols.Http1AndHttp2AndHttp3;
             listenOptions.UseHttps(new TlsHandshakeCallbackOptions

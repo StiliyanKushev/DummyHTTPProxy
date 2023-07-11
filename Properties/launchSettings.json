@@ -1,5 +1,4 @@
-﻿
-{
+﻿{
   "Kestrel": {
     "Certificates": {
       "Default": {
@@ -25,6 +24,5 @@
         "ASPNETCORE_ENVIRONMENT": "Production"
       }
     }
-
   }
 }

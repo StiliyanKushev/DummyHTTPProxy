@@ -1,13 +1,5 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Linq;
-using System.Net.Http;
+﻿using System.Collections.Concurrent;
 using System.Net.WebSockets;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace MyHttpProxy;
 
@@ -22,10 +14,33 @@ public abstract class Listener
     private static readonly ConcurrentDictionary<string, HttpClient>
         ClientPool = new();
     
+    /// <summary>
+    /// Used to retrieve an http client handler based on the hostname.
+    /// </summary>
+    /// <param name="domainName"></param>
     private static HttpClient GetClientFromPool(string domainName)
     {
         return ClientPool.GetOrAdd(domainName, 
-            _ => _clientFactory.CreateClient());
+            _ => _clientFactory.CreateClient("LocalHttpClientHandler"));
+    }
+    
+    /// <summary>
+    /// Define all custom http client handlers.
+    /// </summary>
+    private static readonly HttpClientHandler LocalHttpClientHandler = new()
+    {
+        ClientCertificateOptions = ClientCertificateOption.Manual,
+        ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+    };
+    
+    /// <summary>
+    /// Adds all of our custom http client handlers to the web app builder.
+    /// </summary>
+    /// <param name="builder"></param>
+    public static void AddCustomHttpClients(WebApplicationBuilder builder)
+    {
+        builder.Services.AddHttpClient("LocalHttpClientHandler")
+            .ConfigurePrimaryHttpMessageHandler(() => LocalHttpClientHandler);
     }
     
     /// <summary>
@@ -55,7 +70,8 @@ public abstract class Listener
             // Build the destination URL
             var destinationUrl = new UriBuilder
             {
-                Scheme = request.Scheme,
+                Scheme = context.WebSockets.IsWebSocketRequest 
+                    ? "wss" : request.Scheme,
                 Host = request.Host.Host,
                 Path = request.Path,
                 Query = request.QueryString.ToString()
@@ -67,7 +83,7 @@ public abstract class Listener
                 using var clientWebSocket = new ClientWebSocket();
                 using var browserWebSocket = await context.WebSockets
                     .AcceptWebSocketAsync();
-        
+                
                 // Here, establish a new WebSocket connection to the
                 // destination and start transferring message between
                 // clientWebSocket and serverWebSocket.
@@ -142,41 +158,57 @@ public abstract class Listener
     {
         // Connect to the destination server
         await clientWebSocket.ConnectAsync(targetUri, CancellationToken.None);
-    
-        var buffer = new byte[8192];
 
-        // Start two tasks that will act asynchronously: one will forward all messages from browser to server, 
+        // Start two tasks that will act asynchronously:
+        // one will forward all messages from browser to server, 
         // the other from server to browser
-        var browserToServerTask = ForwardWebSocketMessage(browserWebSocket, clientWebSocket, buffer, "Browser", "Server");
-        var serverToBrowserTask = ForwardWebSocketMessage(clientWebSocket, browserWebSocket, buffer, "Server", "Browser");
+        var browserToServerTask = ForwardWebSocketMessage(
+            browserWebSocket, clientWebSocket);
+        var serverToBrowserTask = ForwardWebSocketMessage(
+            clientWebSocket, browserWebSocket);
 
-        // Wait for any of these tasks to complete. If one fails, other will be cancelled.
-        var firstTask = await Task.WhenAny(browserToServerTask, serverToBrowserTask);
+        // Wait for any of these tasks to complete.
+        // If one fails, other will be cancelled.
+        var firstTask = await Task.WhenAny(
+            browserToServerTask, serverToBrowserTask);
 
-        // If the task has faulted, propagate the exception. This will result in the other task being cancelled.
+        // If the task has faulted, propagate the exception.
+        // This will result in the other task being cancelled.
         await firstTask;
 
         // Wait for the other task to complete
         await Task.WhenAll(browserToServerTask, serverToBrowserTask);
     }
     
-    private static async Task ForwardWebSocketMessage(WebSocket source, WebSocket destination, byte[] buffer, string sourceName, string destinationName)
+    private static async Task ForwardWebSocketMessage(
+        WebSocket source, WebSocket destination)
     {
+        // message buffer
+        var buffer = new byte[8192];
+        
         while (true)
         {
-            var result = await source.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+            var result = await source.ReceiveAsync(
+                new ArraySegment<byte>(buffer), CancellationToken.None);
 
             if (result.MessageType == WebSocketMessageType.Close)
             {
-                await destination.CloseAsync(result.CloseStatus ?? WebSocketCloseStatus.NormalClosure, result.CloseStatusDescription, CancellationToken.None);
-                Console.WriteLine($"{sourceName} sent close message. Close status: {result.CloseStatus}. Description: {result.CloseStatusDescription}.");
+                await destination.CloseAsync(
+                    result.CloseStatus ?? WebSocketCloseStatus.NormalClosure, 
+                    result.CloseStatusDescription, CancellationToken.None);
+                Console.WriteLine(
+                    $"Sent close message. " + 
+                    $"Close status: {result.CloseStatus}. " +
+                    $"Description: {result.CloseStatusDescription}.");
                 break;
             }
-            else
-            {
-                // Write the message received from the source to the destination
-                await destination.SendAsync(new ArraySegment<byte>(buffer, 0, result.Count), result.MessageType, result.EndOfMessage, CancellationToken.None);
-            }
+
+            // Write the message received from the source to the destination
+            await destination.SendAsync(
+                new ArraySegment<byte>(buffer, 0, result.Count), 
+                result.MessageType, 
+                result.EndOfMessage, 
+                CancellationToken.None);
         }
     }
 }
